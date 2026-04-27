@@ -1,3 +1,19 @@
+/**
+ * server/db.ts — 数据库查询辅助函数
+ *
+ * 所有数据库操作都封装在此文件，供 routers.ts 调用。
+ * 表结构定义在 drizzle/schema.ts 中。
+ *
+ * 【包含的查询函数】
+ *   - upsertUser / getUserByOpenId     用户相关（框架内置）
+ *   - createProject / getProjectsByUser / getProjectById / updateProject / deleteProject
+ *   - createUpload / getUploadsByUser / getUploadsByProject
+ *   - createPptSlides / getSlidesByProject / deleteSlidesByProject
+ *
+ * 【交接注意】
+ *   - 修改表结构时：先改 drizzle/schema.ts → pnpm drizzle-kit generate 生成 SQL →
+ *     通过 webdev_execute_sql 工具应用（不要直接运行 migrate 命令）
+ */
 import { eq, desc, and } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {

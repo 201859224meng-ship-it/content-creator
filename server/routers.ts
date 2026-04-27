@@ -1,3 +1,30 @@
+/**
+ * server/routers.ts — 主 tRPC 路由文件
+ *
+ * 本文件是所有后端 API 的入口，包含以下模块：
+ *
+ * 【权限设计】
+ *   - publicProcedure：无需登录，任何人可调用（AI 处理、文件上传、生成类接口）
+ *   - protectedProcedure：需要登录，ctx.user 保证非空（项目保存/查询类接口）
+ *
+ * 【模块列表】
+ *   - auth.*        登录/登出相关（框架内置）
+ *   - ai.*          AI 处理：文字处理/表格生成/图文排版/PPT 生成（全部 public）
+ *   - uploads.*     文件上传与查询（全部 public）
+ *   - projects.*    项目增删改查（全部 protected）
+ *   - system.*      系统通知等（框架内置）
+ *
+ * 【PPT 风格】
+ *   共 6 种美学风格：coquette / dark_academia / cottagecore / minimalism / vaporwave / bauhaus
+ *   风格配置定义在文件顶部 PPT_STYLES 常量中
+ *   新增风格时需同步更新：本文件 PPT_STYLES + client/src/pages/PptGen.tsx PPT_STYLES
+ *
+ * 【交接注意】
+ *   - 未登录用户上传文件时 userId=0，不写入 DB，但文件已存入 S3
+ *   - invokeLLM 调用内置 AI，无需配置 API Key
+ *   - storagePut 存储文件到 S3，返回 url 可直接在前端使用
+ *   - 详细文档请参考 HANDOVER.md
+ */
 import { z } from "zod";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
