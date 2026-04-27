@@ -17,7 +17,16 @@ import {
   Download,
   RotateCcw,
   Eye,
+  Save,
+  LogIn,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 const LAYOUT_STYLES = [
   { key: "magazine", label: "杂志风", desc: "大图配文，高级感" },
@@ -36,14 +45,21 @@ interface UploadedImage {
 
 export default function LayoutGen() {
   const { isAuthenticated } = useAuth();
+  const utils = trpc.useUtils();
   const [inputText, setInputText] = useState("");
   const [layoutStyle, setLayoutStyle] = useState<LayoutStyle>("magazine");
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
   const [generatedHtml, setGeneratedHtml] = useState("");
   const [isDragging, setIsDragging] = useState(false);
+  const [loginPromptOpen, setLoginPromptOpen] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
   const uploadMutation = trpc.uploads.upload.useMutation();
+
+  const createProject = trpc.projects.create.useMutation({
+    onSuccess: () => { utils.projects.list.invalidate(); toast.success("项目已保存"); },
+    onError: () => toast.error("保存失败"),
+  });
 
   const generateLayout = trpc.ai.generateLayout.useMutation({
     onSuccess: (data) => {
@@ -57,7 +73,6 @@ export default function LayoutGen() {
 
   const handleImageFile = useCallback(
     async (file: File) => {
-      if (!isAuthenticated) return;
       const reader = new FileReader();
       reader.onload = async (e) => {
         const base64 = (e.target?.result as string).split(",")[1];
@@ -76,7 +91,7 @@ export default function LayoutGen() {
       };
       reader.readAsDataURL(file);
     },
-    [isAuthenticated, uploadMutation]
+    [uploadMutation]
   );
 
   const handleDrop = useCallback(
@@ -93,10 +108,6 @@ export default function LayoutGen() {
   const handleGenerate = () => {
     if (!inputText.trim()) {
       toast.error("请先输入文字内容");
-      return;
-    }
-    if (!isAuthenticated) {
-      toast.error("请先登录");
       return;
     }
     generateLayout.mutate({
@@ -129,24 +140,20 @@ export default function LayoutGen() {
     toast.success("HTML 已下载");
   };
 
-  if (!isAuthenticated) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 px-6">
-        <div className="w-16 h-16 rounded-2xl bg-secondary flex items-center justify-center">
-          <Layout className="w-8 h-8 text-primary" />
-        </div>
-        <div className="text-center">
-          <h2 className="text-2xl font-semibold text-foreground mb-2" style={{ fontFamily: "var(--font-serif)" }}>
-            图文排版
-          </h2>
-          <p className="text-muted-foreground">登录后即可使用 AI 图文排版功能</p>
-        </div>
-        <Button onClick={() => (window.location.href = getLoginUrl())} size="lg">
-          登录开始使用
-        </Button>
-      </div>
-    );
-  }
+  const handleSave = () => {
+    if (!generatedHtml) return;
+    if (!isAuthenticated) {
+      setLoginPromptOpen(true);
+      return;
+    }
+    createProject.mutate({
+      title: `图文排版 - ${LAYOUT_STYLES.find(s => s.key === layoutStyle)?.label}`,
+      type: "layout",
+      description: inputText.slice(0, 100),
+      content: generatedHtml,
+      meta: { layoutStyle, imageCount: uploadedImages.length },
+    });
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-8">
@@ -282,20 +289,15 @@ export default function LayoutGen() {
                 <Eye className="w-4 h-4 text-muted-foreground" />
                 <span className="text-sm font-medium text-foreground">排版预览</span>
                 <div className="flex-1" />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5 h-7 text-xs"
-                  onClick={() => setGeneratedHtml("")}
-                >
+                <Button variant="outline" size="sm" className="gap-1.5 h-7 text-xs" onClick={() => setGeneratedHtml("")}>
                   <RotateCcw className="w-3 h-3" />
                   重置
                 </Button>
-                <Button
-                  size="sm"
-                  className="gap-1.5 h-7 text-xs"
-                  onClick={handleExportHtml}
-                >
+                <Button variant="outline" size="sm" className="gap-1.5 h-7 text-xs" onClick={handleSave} disabled={createProject.isPending}>
+                  <Save className="w-3 h-3" />
+                  保存
+                </Button>
+                <Button size="sm" className="gap-1.5 h-7 text-xs" onClick={handleExportHtml}>
                   <Download className="w-3 h-3" />
                   导出 HTML
                 </Button>
@@ -323,6 +325,23 @@ export default function LayoutGen() {
           )}
         </div>
       </div>
+
+      {/* Login Prompt */}
+      <Dialog open={loginPromptOpen} onOpenChange={setLoginPromptOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle style={{ fontFamily: "var(--font-serif)" }}>保存项目需要登录</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground py-2">登录后即可将创作保存到项目中，随时查看和继续编辑。</p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLoginPromptOpen(false)}>稍后再说</Button>
+            <Button onClick={() => (window.location.href = getLoginUrl())} className="gap-1.5">
+              <LogIn className="w-4 h-4" />
+              立即登录
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

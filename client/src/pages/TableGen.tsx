@@ -1,6 +1,14 @@
 import { useState } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
+import { LogIn } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -38,6 +46,7 @@ export default function TableGen() {
   const [inputText, setInputText] = useState("");
   const [tableType, setTableType] = useState<TableType>("auto");
   const [tableData, setTableData] = useState<TableData | null>(null);
+  const [loginPromptOpen, setLoginPromptOpen] = useState(false);
 
   const utils = trpc.useUtils();
   const createProject = trpc.projects.create.useMutation({
@@ -60,11 +69,22 @@ export default function TableGen() {
       toast.error("请先输入文字内容");
       return;
     }
+    generateTable.mutate({ text: inputText, tableType });
+  };
+
+  const handleSaveProject = () => {
+    if (!tableData) return;
     if (!isAuthenticated) {
-      toast.error("请先登录");
+      setLoginPromptOpen(true);
       return;
     }
-    generateTable.mutate({ text: inputText, tableType });
+    createProject.mutate({
+      title: tableData.title || "表格项目",
+      type: "table",
+      description: tableData.summary,
+      content: JSON.stringify(tableData),
+      meta: { tableType, inputText },
+    });
   };
 
   const handleExportCSV = () => {
@@ -80,25 +100,6 @@ export default function TableGen() {
     URL.revokeObjectURL(url);
     toast.success("CSV 已下载");
   };
-
-  if (!isAuthenticated) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 px-6">
-        <div className="w-16 h-16 rounded-2xl bg-secondary flex items-center justify-center">
-          <Table2 className="w-8 h-8 text-primary" />
-        </div>
-        <div className="text-center">
-          <h2 className="text-2xl font-semibold text-foreground mb-2" style={{ fontFamily: "var(--font-serif)" }}>
-            表格生成
-          </h2>
-          <p className="text-muted-foreground">登录后即可使用 AI 表格生成功能</p>
-        </div>
-        <Button onClick={() => (window.location.href = getLoginUrl())} size="lg">
-          登录开始使用
-        </Button>
-      </div>
-    );
-  }
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-8">
@@ -205,16 +206,7 @@ export default function TableGen() {
                     variant="outline"
                     size="sm"
                     className="gap-1.5 h-7 text-xs"
-                    onClick={() => {
-                      if (!tableData) return;
-                      createProject.mutate({
-                        title: tableData.title || "表格项目",
-                        type: "table",
-                        description: tableData.summary,
-                        content: JSON.stringify(tableData),
-                        meta: { tableType, inputText },
-                      });
-                    }}
+                    onClick={handleSaveProject}
                     disabled={createProject.isPending}
                   >
                     <Save className="w-3 h-3" />
@@ -286,6 +278,22 @@ export default function TableGen() {
           )}
         </div>
       </div>
+      {/* Login Prompt */}
+      <Dialog open={loginPromptOpen} onOpenChange={setLoginPromptOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle style={{ fontFamily: "var(--font-serif)" }}>保存项目需要登录</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground py-2">登录后即可将创作保存到项目中，随时查看和继续编辑。</p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLoginPromptOpen(false)}>稍后再说</Button>
+            <Button onClick={() => (window.location.href = getLoginUrl())} className="gap-1.5">
+              <LogIn className="w-4 h-4" />
+              立即登录
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

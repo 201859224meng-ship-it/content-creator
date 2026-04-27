@@ -35,3 +35,15 @@
 - [x] 编写 vitest 单元测试（6 个测试全部通过）
 - [x] 整合调试所有功能
 - [x] 保存检查点并交付
+
+## 无需登录直接使用（新需求）
+- [x] 后端 AI 处理接口改为 publicProcedure（无需登录）
+- [x] 后端文件上传接口改为 publicProcedure
+- [x] 后端表格生成接口改为 publicProcedure
+- [x] 后端图文排版生成接口改为 publicProcedure
+- [x] 后端 PPT 生成接口改为 publicProcedure
+- [x] 前端 Editor 页面移除登录限制
+- [x] 前端 TableGen 页面移除登录限制
+- [x] 前端 LayoutGen 页面移除登录限制
+- [x] 前端 PptGen 页面移除登录限制
+- [x] 项目保存功能：未登录时提示登录后保存，已登录正常保存

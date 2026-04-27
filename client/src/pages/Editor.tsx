@@ -32,6 +32,7 @@ import {
   Edit3,
   SplitSquareHorizontal,
   Eye,
+  LogIn,
 } from "lucide-react";
 
 const AI_MODES = [
@@ -64,6 +65,7 @@ export default function Editor() {
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [loginPromptOpen, setLoginPromptOpen] = useState(false);
   const [projectTitle, setProjectTitle] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -101,7 +103,6 @@ export default function Editor() {
 
   const handleImageFile = useCallback(
     async (file: File) => {
-      if (!isAuthenticated) return;
       const reader = new FileReader();
       reader.onload = async (e) => {
         const base64 = (e.target?.result as string).split(",")[1];
@@ -120,7 +121,7 @@ export default function Editor() {
       };
       reader.readAsDataURL(file);
     },
-    [isAuthenticated, uploadMutation]
+    [uploadMutation]
   );
 
   const handleDrop = useCallback(
@@ -142,10 +143,6 @@ export default function Editor() {
   const handleProcess = () => {
     if (!inputText.trim()) {
       toast.error("请先输入或上传文字内容");
-      return;
-    }
-    if (!isAuthenticated) {
-      toast.error("请先登录");
       return;
     }
     processText.mutate({ text: inputText, mode: selectedMode });
@@ -171,6 +168,10 @@ export default function Editor() {
       toast.error("暂无内容可保存");
       return;
     }
+    if (!isAuthenticated) {
+      setLoginPromptOpen(true);
+      return;
+    }
     setProjectTitle("AI 文字编辑 - " + new Date().toLocaleDateString("zh-CN"));
     setSaveDialogOpen(true);
   };
@@ -190,25 +191,6 @@ export default function Editor() {
       },
     });
   };
-
-  if (!isAuthenticated) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 px-6">
-        <div className="w-16 h-16 rounded-2xl bg-secondary flex items-center justify-center">
-          <Wand2 className="w-8 h-8 text-primary" />
-        </div>
-        <div className="text-center">
-          <h2 className="text-2xl font-semibold text-foreground mb-2" style={{ fontFamily: "var(--font-serif)" }}>
-            AI 文字编辑器
-          </h2>
-          <p className="text-muted-foreground">登录后即可使用 AI 文字处理功能</p>
-        </div>
-        <Button onClick={() => (window.location.href = getLoginUrl())} size="lg">
-          登录开始使用
-        </Button>
-      </div>
-    );
-  }
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-8">
@@ -353,7 +335,6 @@ export default function Editor() {
                   <CheckCircle2 className="w-3 h-3" />
                   {useAI ? AI_MODES.find((m) => m.key === selectedMode)?.label : "原文"}
                 </Badge>
-                {/* View mode toggle */}
                 <div className="flex rounded-lg border border-border overflow-hidden">
                   <button
                     onClick={() => setViewMode("single")}
@@ -380,7 +361,6 @@ export default function Editor() {
 
           {outputText ? (
             viewMode === "compare" ? (
-              /* Compare view */
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-xl border border-border bg-card overflow-hidden">
                   <div className="px-3 py-2 border-b border-border bg-secondary/30">
@@ -400,9 +380,7 @@ export default function Editor() {
                 </div>
               </div>
             ) : (
-              /* Single view */
               <div className="rounded-xl border border-border bg-card overflow-hidden">
-                {/* Toolbar */}
                 <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border bg-secondary/30">
                   <button
                     onClick={() => setIsEditing(!isEditing)}
@@ -424,7 +402,6 @@ export default function Editor() {
                   </button>
                 </div>
 
-                {/* Content */}
                 <div className="p-4">
                   {isEditing ? (
                     <Textarea
@@ -439,15 +416,20 @@ export default function Editor() {
                   )}
                 </div>
 
-                {/* Footer */}
                 <div className="px-4 py-2.5 border-t border-border bg-secondary/20 flex items-center justify-between">
                   <p className="text-xs text-muted-foreground">
                     {(isEditing ? editedText : outputText).length} 字
                   </p>
-                  <Button size="sm" className="gap-1.5 h-7 text-xs" onClick={handleSave}>
-                    <Save className="w-3 h-3" />
-                    保存到项目
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" className="gap-1.5 h-7 text-xs" onClick={handleCopy}>
+                      <Copy className="w-3 h-3" />
+                      复制内容
+                    </Button>
+                    <Button size="sm" className="gap-1.5 h-7 text-xs" onClick={handleSave}>
+                      <Save className="w-3 h-3" />
+                      保存到项目
+                    </Button>
+                  </div>
                 </div>
               </div>
             )
@@ -483,6 +465,25 @@ export default function Editor() {
             <Button onClick={confirmSave} disabled={createProject.isPending} className="gap-1.5">
               {createProject.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               保存
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Login Prompt Dialog */}
+      <Dialog open={loginPromptOpen} onOpenChange={setLoginPromptOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle style={{ fontFamily: "var(--font-serif)" }}>保存项目需要登录</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground py-2">
+            登录后即可将您的创作保存到项目中，随时查看和继续编辑。
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLoginPromptOpen(false)}>稍后再说</Button>
+            <Button onClick={() => (window.location.href = getLoginUrl())} className="gap-1.5">
+              <LogIn className="w-4 h-4" />
+              立即登录
             </Button>
           </DialogFooter>
         </DialogContent>

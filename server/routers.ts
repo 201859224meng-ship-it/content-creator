@@ -215,17 +215,18 @@ export const appRouter = router({
 
   // ─── Uploads ─────────────────────────────────────────────────────────────────
   uploads: router({
-    list: protectedProcedure.query(async ({ ctx }) => {
+    list: publicProcedure.query(async ({ ctx }) => {
+      if (!ctx.user) return [];
       return getUploadsByUser(ctx.user.id);
     }),
 
-    byProject: protectedProcedure
+    byProject: publicProcedure
       .input(z.object({ projectId: z.number() }))
       .query(async ({ input }) => {
         return getUploadsByProject(input.projectId);
       }),
 
-    upload: protectedProcedure
+    upload: publicProcedure
       .input(
         z.object({
           filename: z.string(),
@@ -237,19 +238,23 @@ export const appRouter = router({
       )
       .mutation(async ({ ctx, input }) => {
         const buffer = Buffer.from(input.base64Data, "base64");
-        const key = `uploads/${ctx.user.id}/${Date.now()}-${input.filename}`;
+        const userId = ctx.user?.id ?? 0;
+        const key = `uploads/${userId}/${Date.now()}-${input.filename}`;
         const { url } = await storagePut(key, buffer, input.mimeType);
 
-        await createUpload({
-          userId: ctx.user.id,
-          projectId: input.projectId ?? null,
-          filename: input.filename,
-          originalName: input.filename,
-          mimeType: input.mimeType,
-          size: input.size,
-          storageKey: key,
-          storageUrl: url,
-        });
+        // Only save to DB if user is logged in
+        if (ctx.user) {
+          await createUpload({
+            userId: ctx.user.id,
+            projectId: input.projectId ?? null,
+            filename: input.filename,
+            originalName: input.filename,
+            mimeType: input.mimeType,
+            size: input.size,
+            storageKey: key,
+            storageUrl: url,
+          });
+        }
 
         return { url, key };
       }),
@@ -257,7 +262,7 @@ export const appRouter = router({
 
   // ─── AI Processing ────────────────────────────────────────────────────────────
   ai: router({
-    processText: protectedProcedure
+    processText: publicProcedure
       .input(
         z.object({
           text: z.string().min(1),
@@ -296,7 +301,7 @@ export const appRouter = router({
         return { result };
       }),
 
-    generateTable: protectedProcedure
+    generateTable: publicProcedure
       .input(
         z.object({
           text: z.string().min(1),
@@ -358,7 +363,7 @@ ${input.text}`,
         };
       }),
 
-    generateLayout: protectedProcedure
+    generateLayout: publicProcedure
       .input(
         z.object({
           text: z.string().min(1),
@@ -399,7 +404,7 @@ ${input.text}`,
         return { html };
       }),
 
-    generatePpt: protectedProcedure
+    generatePpt: publicProcedure
       .input(
         z.object({
           text: z.string().min(1),
@@ -500,7 +505,7 @@ ${input.text}`,
         };
       }),
 
-    getSlides: protectedProcedure
+    getSlides: publicProcedure
       .input(z.object({ projectId: z.number() }))
       .query(async ({ input }) => {
         return getSlidesByProject(input.projectId);

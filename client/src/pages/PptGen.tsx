@@ -16,7 +16,16 @@ import {
   Download,
   RotateCcw,
   Check,
+  Save,
+  LogIn,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 const PPT_STYLES = [
   {
@@ -93,11 +102,34 @@ interface Slide {
 
 export default function PptGen() {
   const { isAuthenticated } = useAuth();
+  const utils = trpc.useUtils();
   const [inputText, setInputText] = useState("");
   const [selectedStyle, setSelectedStyle] = useState<PptStyleKey>("minimalism");
   const [slideCount, setSlideCount] = useState(8);
   const [slides, setSlides] = useState<Slide[]>([]);
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [loginPromptOpen, setLoginPromptOpen] = useState(false);
+
+  const createProject = trpc.projects.create.useMutation({
+    onSuccess: () => { utils.projects.list.invalidate(); toast.success("项目已保存"); },
+    onError: () => toast.error("保存失败"),
+  });
+
+  const handleSave = () => {
+    if (!slides.length) return;
+    if (!isAuthenticated) {
+      setLoginPromptOpen(true);
+      return;
+    }
+    const styleInfo = PPT_STYLES.find((s) => s.key === selectedStyle)!;
+    createProject.mutate({
+      title: `PPT - ${styleInfo.nameZh}风格`,
+      type: "ppt",
+      description: inputText.slice(0, 100),
+      content: JSON.stringify(slides),
+      meta: { style: selectedStyle, slideCount: slides.length },
+    });
+  };
 
   const generatePpt = trpc.ai.generatePpt.useMutation({
     onSuccess: (data) => {
@@ -113,10 +145,6 @@ export default function PptGen() {
   const handleGenerate = () => {
     if (!inputText.trim()) {
       toast.error("请先输入内容");
-      return;
-    }
-    if (!isAuthenticated) {
-      toast.error("请先登录");
       return;
     }
     generatePpt.mutate({ text: inputText, style: selectedStyle, slideCount });
@@ -182,25 +210,6 @@ document.addEventListener('keydown', e => { if(e.key==='ArrowRight'||e.key===' '
     URL.revokeObjectURL(url);
     toast.success("PPT HTML 已下载，可在浏览器中演示");
   };
-
-  if (!isAuthenticated) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 px-6">
-        <div className="w-16 h-16 rounded-2xl bg-secondary flex items-center justify-center">
-          <Presentation className="w-8 h-8 text-primary" />
-        </div>
-        <div className="text-center">
-          <h2 className="text-2xl font-semibold text-foreground mb-2" style={{ fontFamily: "var(--font-serif)" }}>
-            PPT 生成
-          </h2>
-          <p className="text-muted-foreground">登录后即可使用 AI PPT 生成功能</p>
-        </div>
-        <Button onClick={() => (window.location.href = getLoginUrl())} size="lg">
-          登录开始使用
-        </Button>
-      </div>
-    );
-  }
 
   const currentStyleInfo = PPT_STYLES.find((s) => s.key === selectedStyle)!;
 
@@ -391,6 +400,16 @@ document.addEventListener('keydown', e => { if(e.key==='ArrowRight'||e.key===' '
                     重新生成
                   </Button>
                   <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 h-8 text-xs"
+                    onClick={handleSave}
+                    disabled={createProject.isPending}
+                  >
+                    <Save className="w-3 h-3" />
+                    保存
+                  </Button>
+                  <Button
                     size="sm"
                     className="gap-1.5 h-8 text-xs"
                     onClick={handleExportHtml}
@@ -479,6 +498,22 @@ document.addEventListener('keydown', e => { if(e.key==='ArrowRight'||e.key===' '
           )}
         </div>
       </div>
+      {/* Login Prompt */}
+      <Dialog open={loginPromptOpen} onOpenChange={setLoginPromptOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle style={{ fontFamily: "var(--font-serif)" }}>保存项目需要登录</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground py-2">登录后即可将创作保存到项目中，随时查看和继续编辑。</p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLoginPromptOpen(false)}>稍后再说</Button>
+            <Button onClick={() => (window.location.href = getLoginUrl())} className="gap-1.5">
+              <LogIn className="w-4 h-4" />
+              立即登录
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
